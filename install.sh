@@ -65,8 +65,15 @@ check_root() {
 detect_usb_drives() {
     print_step "Detecting USB drives..."
 
-    # Get list of USB drives (excluding system drive)
-    local drives=($(lsblk -d -n -o NAME,MODEL,SIZE,TRAN | grep -v "sda" | grep -E "usb|sdb|sdc|sdd|sde|sdf" | awk '{print $1}'))
+    # Determine the system root disk so we can exclude it
+    local root_part=$(findmnt -n -o SOURCE / 2>/dev/null || df / | tail -n 1 | awk '{print $1}')
+    local root_disk=$(lsblk -no PKNAME "$root_part" 2>/dev/null || true)
+    if [[ -z "$root_disk" ]]; then
+        root_disk=$(echo "$root_part" | sed -E 's|^/dev/||; s/p?[0-9]+$//; s/[0-9]+$//')
+    fi
+
+    # Get list of USB/SATA drives (excluding system drive)
+    local drives=($(lsblk -d -n -o NAME,MODEL,SIZE,TRAN | awk -v root="$root_disk" '$1 != root && ($1 ~ /^sd[a-z]/ || tolower($0) ~ /usb/) {print $1}'))
 
     if [[ ${#drives[@]} -eq 0 ]]; then
         print_error "No USB drives detected!"
