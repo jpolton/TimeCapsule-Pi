@@ -386,8 +386,9 @@ create_smb_conf() {
     read raw = yes
     write raw = yes
 
-    bind interfaces only = yes
-    interfaces = 127.0.0.1 192.168.1.0/24
+    # Network defaults. Commented out to allow binding on any subnet.
+    # bind interfaces only = yes
+    # interfaces = 127.0.0.1 192.168.1.0/24
 
 [$SHARE_NAME]
     comment = Time Machine Backup on Pi4
