@@ -299,6 +299,16 @@ setup_mount() {
         echo "$fstab_entry" >> /etc/fstab
     fi
 
+    # Reload systemd to recognize fstab changes
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl daemon-reload
+    fi
+
+    # Ensure device nodes are fully settled
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm settle
+    fi
+
     # Mount the drive
     print_info "Mounting drive..."
     mount -a
@@ -381,7 +391,7 @@ create_smb_conf() {
 
     security = user
     passdb backend = tdbsam
-    encrypt passwords = yes
+    # encrypt passwords = yes (deprecated)
 
     read raw = yes
     write raw = yes
@@ -402,6 +412,10 @@ create_smb_conf() {
 
     fruit:time machine max size = $QUOTA_SIZE
     vfs objects = catia fruit streams_xattr
+
+    # Common macOS-friendly settings
+    fruit:aapl = yes
+    fruit:posix_rename = yes
 EOF
 }
 
