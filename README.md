@@ -48,7 +48,7 @@ A complete, production-ready solution to transform a Raspberry Pi (3B+/4/5) into
 
 1. **Clone this repository:**
    ```bash
-   git clone https://github.com/rizal72/TimeCapsule-Pi.git
+   git clone https://github.com/jpolton/TimeCapsule-Pi.git
    cd TimeCapsule-Pi
    ```
 
