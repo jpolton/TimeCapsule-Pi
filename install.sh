@@ -358,8 +358,12 @@ configure_samba() {
 
     # Restart Samba
     print_info "Restarting Samba..."
-    systemctl restart smbd nmbd
-    systemctl enable smbd nmbd
+    systemctl restart smbd
+    systemctl enable smbd
+
+    # Clean up NetBIOS (unnecessary for macOS and causes timeouts)
+    systemctl disable nmbd 2>/dev/null || true
+    systemctl stop nmbd 2>/dev/null || true
 
     print_info "Samba configured and started."
 }
@@ -378,6 +382,10 @@ create_smb_conf() {
 
     min protocol = SMB2
     max protocol = SMB3
+
+    # Disable NetBIOS as it's not needed for modern macOS
+    disable netbios = yes
+    smb ports = 445
 
     fruit:time machine = yes
     fruit:delete vacuum files = yes
@@ -470,11 +478,11 @@ run_tests() {
 
     # Test 1: Check services
     print_info "Checking services..."
-    if systemctl is-active --quiet smbd && systemctl is-active --quiet nmbd && systemctl is-active --quiet avahi-daemon; then
+    if systemctl is-active --quiet smbd && systemctl is-active --quiet avahi-daemon; then
         print_info "All services are running."
     else
         print_error "Some services are not running!"
-        systemctl status smbd nmbd avahi-daemon --no-pager
+        systemctl status smbd avahi-daemon --no-pager
         exit 1
     fi
 
@@ -517,7 +525,7 @@ print_summary() {
     echo "  6. Start your first backup!"
     echo
     echo -e "${YELLOW}Useful commands:${NC}"
-    echo "  Check Samba:     systemctl status smbd nmbd"
+    echo "  Check Samba:     systemctl status smbd"
     echo "  Check Avahi:     systemctl status avahi-daemon"
     echo "  Check mount:     df -h | grep timecapsule"
     echo "  List shares:     smbclient -L localhost -U $TM_USER"
