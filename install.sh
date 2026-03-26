@@ -158,16 +158,18 @@ install_packages() {
 
     apt update
 
-    # Install Samba and Avahi
-    apt install -y samba samba-common-bin avahi-daemon
+    # Install Samba, VFS modules, and Avahi
+    apt install -y samba samba-common-bin samba-vfs-modules avahi-daemon
 
     # Check Samba version
     local samba_version=$(smbd --version)
     print_info "Samba version: $samba_version"
 
     # Check vfs_fruit support
-    if smbd -b | grep -q VFS_MODULE_FRUIT; then
+    if smbd -b | grep -qi "fruit"; then
         print_info "vfs_fruit module: supported"
+    elif dpkg -l | grep -q "samba-vfs-modules"; then
+        print_info "vfs_fruit module: supported (via samba-vfs-modules)"
     else
         print_error "vfs_fruit module NOT found. Time Machine requires this module."
         exit 1
