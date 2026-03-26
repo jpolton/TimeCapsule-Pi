@@ -109,6 +109,21 @@ detect_usb_drives() {
     lsblk "$SELECTED_DRIVE"
     echo
 
+    # Check for existing LUKS crypt volume
+    LUKS_DEV=""
+    local crypt_dev=$(lsblk -l -n -o NAME,TYPE "$SELECTED_DRIVE" 2>/dev/null | awk '$2=="crypt" {print $1}' | head -n1)
+    if [[ -n "$crypt_dev" ]]; then
+        print_info "LUKS encrypted container detected: /dev/mapper/$crypt_dev"
+        if confirm "Do you want to use this encrypted container instead of wiping the entire disk?"; then
+            LUKS_DEV="/dev/mapper/$crypt_dev"
+            if ! confirm "This will ERASE ALL DATA inside the encrypted container $LUKS_DEV. Continue?"; then
+                print_info "Installation cancelled by user."
+                exit 0
+            fi
+            return
+        fi
+    fi
+
     # Confirm format
     if ! confirm "This will ERASE ALL DATA on $SELECTED_DRIVE. Continue?"; then
         print_info "Installation cancelled by user."
@@ -233,13 +248,42 @@ EOF
 
 # Format drive
 format_drive() {
+    if [[ -n "$LUKS_DEV" ]]; then
+        print_step "Formatting LUKS container $LUKS_DEV as ext4..."
+        
+        # Unmount if mounted
+        for mp in $(lsblk -l -n -o MOUNTPOINT "$LUKS_DEV" 2>/dev/null | awk 'NF' | sort -r); do
+            umount "$mp" 2>/dev/null || true
+        done
+        
+        # Format as ext4
+        print_info "Formatting $LUKS_DEV as ext4..."
+        mkfs.ext4 -F -L TimeCapsule "$LUKS_DEV"
+        
+        TARGET_PART="$LUKS_DEV"
+        print_info "LUKS container formatted successfully."
+        return
+    fi
+
     print_step "Formatting drive as ext4..."
 
     print_warning "Partitioning $SELECTED_DRIVE..."
 
-    # Unmount if mounted
-    for mount in $(mount | grep "^${SELECTED_DRIVE}" | awk '{print $1}'); do
-        umount "$mount" 2>/dev/null || true
+    # Identify any mapped volumes (like LUKS/LVM) locking the drive and close them
+    local mapped_devs=$(lsblk -l -n -o NAME,TYPE "$SELECTED_DRIVE" 2>/dev/null | awk '$2=="crypt" || $2=="lvm" || $2=="mpath" {print $1}')
+    for dev in $mapped_devs; do
+        if command -v cryptsetup >/dev/null 2>&1; then cryptsetup close "$dev" 2>/dev/null || true; fi
+        if command -v dmsetup >/dev/null 2>&1; then dmsetup remove "$dev" 2>/dev/null || true; fi
+    done
+
+    # Turn off swap if any exists on this drive
+    for dev in $(lsblk -l -n -o NAME "$SELECTED_DRIVE" 2>/dev/null); do
+        swapoff "/dev/$dev" 2>/dev/null || true
+    done
+
+    # Unmount if any regular partition is mounted (using lsblk to catch nested/hidden mounts)
+    for mp in $(lsblk -l -n -o MOUNTPOINT "$SELECTED_DRIVE" 2>/dev/null | awk 'NF' | sort -r); do
+        umount "$mp" 2>/dev/null || true
     done
 
     # Create new partition table
@@ -263,8 +307,9 @@ EOF
 
     # Format as ext4
     print_info "Formatting ${partition} as ext4..."
-    mkfs.ext4 -L TimeCapsule "$partition"
+    mkfs.ext4 -F -L TimeCapsule "$partition"
 
+    TARGET_PART="$partition"
     print_info "Drive formatted successfully."
 }
 
@@ -272,7 +317,8 @@ EOF
 setup_mount() {
     print_step "Setting up auto-mount..."
 
-    local partition="${SELECTED_DRIVE}1"
+    local partition="$TARGET_PART"
+    [[ -z "$partition" ]] && partition="${SELECTED_DRIVE}1"
 
     # Create mount point
     print_info "Creating mount point: $MOUNT_POINT"
