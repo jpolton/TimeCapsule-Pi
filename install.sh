@@ -464,6 +464,7 @@ create_smb_conf() {
     guest ok = no
     valid users = $TM_USER
 
+    fruit:time machine = yes
     fruit:time machine max size = $QUOTA_SIZE
     vfs objects = catia fruit streams_xattr
 
