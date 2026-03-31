@@ -335,7 +335,7 @@ setup_mount() {
     print_info "Partition UUID: $uuid"
 
     # Add to fstab
-    local fstab_entry="UUID=$uuid $MOUNT_POINT ext4 defaults,noatime 0 2"
+    local fstab_entry="UUID=$uuid $MOUNT_POINT ext4 defaults,noatime,nofail 0 2"
 
     if awk '{print $2}' /etc/fstab | grep -q "^${MOUNT_POINT}$"; then
         print_warning "Cleaning up old fstab entries for $MOUNT_POINT..."
