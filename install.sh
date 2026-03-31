@@ -337,13 +337,14 @@ setup_mount() {
     # Add to fstab
     local fstab_entry="UUID=$uuid $MOUNT_POINT ext4 defaults,noatime 0 2"
 
-    if grep -q "$uuid" /etc/fstab; then
-        print_warning "fstab entry already exists. Updating..."
-        sed -i "s|UUID=$uuid.*|$fstab_entry|" /etc/fstab
-    else
-        print_info "Adding entry to /etc/fstab..."
-        echo "$fstab_entry" >> /etc/fstab
+    if awk '{print $2}' /etc/fstab | grep -q "^${MOUNT_POINT}$"; then
+        print_warning "Cleaning up old fstab entries for $MOUNT_POINT..."
+        cp /etc/fstab "/etc/fstab.backup.$(date +%Y%m%d_%H%M%S)"
+        awk -v mp="$MOUNT_POINT" '$2 != mp' /etc/fstab > /tmp/fstab.tmp && mv /tmp/fstab.tmp /etc/fstab
     fi
+
+    print_info "Adding entry to /etc/fstab..."
+    echo "$fstab_entry" >> /etc/fstab
 
     # Reload systemd to recognize fstab changes
     if command -v systemctl >/dev/null 2>&1; then
