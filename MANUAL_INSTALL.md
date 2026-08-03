@@ -58,7 +58,7 @@ sudo apt autoremove -y
 Install Samba and required dependencies:
 
 ```bash
-sudo apt install -y samba samba-common-bin avahi-daemon
+sudo apt install -y samba samba-common-bin samba-vfs-modules avahi-daemon
 ```
 
 Verify Samba version (must be 4.x with vfs_fruit support):
@@ -71,8 +71,14 @@ smbd --version
 Check if vfs_fruit module is available:
 
 ```bash
-smbd -b | grep vfs_fruit
-# Should show: VFS_MODULE_FRUIT
+# Check vfs_fruit support
+if smbd -b | grep -i "fruit"; then
+    print_info "vfs_fruit module: supported"
+elif dpkg -l | grep -q "samba-vfs-modules"; then
+    print_info "vfs_fruit module: supported (via samba-vfs-modules)"
+else
+    print_error "vfs_fruit module NOT found. Time Machine requires this module."
+    exit 1
 ```
 
 ---
@@ -418,6 +424,7 @@ You should see a `.Spotlight-V100` folder and a `Backups.backupdb` folder.
     valid users = your_username
 
     # Time Machine specific
+    fruit:time machine = yes
     fruit:time machine max size = 2T
     vfs objects = catia fruit streams_xattr
 ```
